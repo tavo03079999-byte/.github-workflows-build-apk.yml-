@@ -1,0 +1,64 @@
+name: Compilar APK GG
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Compilar app-debug.apk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del codigo fuente
+        uses: actions/checkout@v4
+
+      - name: Descomprimir paquete ZIP si existe
+        run: |
+          if [ -f "GG_Actualizado_Para_GitHub.zip" ]; then
+            unzip -o GG_Actualizado_Para_GitHub.zip
+          fi
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compilar aplicacion web Vite
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          mkdir -p android/app/src/main/assets/www
+          cp -r dist/* android/app/src/main/assets/www/
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurar Gradle 8.6
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
+
+      - name: Generar app-debug.apk
+        working-directory: android
+        run: |
+          chmod +x gradlew || true
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: Subir app-debug.apk como Artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: GG-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
